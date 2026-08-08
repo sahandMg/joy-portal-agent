@@ -59,7 +59,8 @@ class AddXrayUser extends Command
             return self::FAILURE;
         }
 
-        $this->info('User added and read back from Xray.');
+        $this->info('Xray accepted the add-user request.');
+        $this->warn('An empty object in inbounduser output is a CLI/Core serialization limitation; verify with user count and traffic stats.');
         $this->line(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
         return self::SUCCESS;
     }
