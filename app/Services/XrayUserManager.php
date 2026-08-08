@@ -28,6 +28,7 @@ class XrayUserManager
         string $protocol,
         string $uuid,
         string $email,
+        int $port,
         int $level = 0,
         int $alterId = 0
     ): array {
@@ -54,6 +55,7 @@ class XrayUserManager
         $payload = [
             'inbounds' => [[
                 'tag' => $tag,
+                'port' => $port,
                 'protocol' => $protocol,
                 'settings' => $settings,
             ]],

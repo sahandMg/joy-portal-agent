@@ -42,11 +42,11 @@ API مدیریتی Xray را روی IP عمومی یا `0.0.0.0` باز نکنی
 ```
 
 API باید با inbound/routing متناسب با نسخه Xray روی loopback در دسترس باشد. مثال
-آدرس این پروژه `127.0.0.1:10085` است. ابتدا مستقیماً روی Portal آزمایش کنید:
+آدرس فعلی API روی Portal، `127.0.0.1:62789` است. ابتدا مستقیماً روی Portal آزمایش کنید:
 
 ```bash
 /usr/local/x-ui/bin/xray-linux-amd64 api statsquery \
-  --server=127.0.0.1:10085 \
+  --server=127.0.0.1:62789 \
   -pattern 'user>>>' \
   -reset=false
 ```
@@ -72,7 +72,7 @@ touch database/database.sqlite
 DB_CONNECTION=sqlite
 DB_DATABASE=/opt/joy-portal-agent/database/database.sqlite
 XRAY_BINARY=/usr/local/x-ui/bin/xray-linux-amd64
-XRAY_API_ADDRESS=127.0.0.1:10085
+XRAY_API_ADDRESS=127.0.0.1:62789
 XRAY_API_TIMEOUT=5
 XRAY_STATS_PATTERN=user>>>
 XRAY_RESET_AFTER_READ=false

@@ -26,7 +26,18 @@ php artisan xray:users:add \
   inbound-20180 \
   vless \
   11111111-1111-4111-8111-111111111111 \
-  joy:test-user-a
+  joy:test-user-a \
+  --port=20180
+```
+
+For tags ending in `inbound-PORT`, such as `inbound-20180`, `--port` is
+inferred automatically. Passing it explicitly is recommended for the first
+Portal validation.
+
+Confirm that the runtime count increased:
+
+```bash
+php artisan xray:users:count inbound-20180
 ```
 
 For VMess, use `vmess` and pass `--alter-id=N` when required.
