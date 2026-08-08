@@ -32,6 +32,8 @@ class XrayUserManager
         int $alterId = 0
     ): array {
         $this->ensureWritesEnabled();
+        $beforeCountPayload = $this->count($tag);
+        $beforeCount = $this->extractCount($beforeCountPayload);
 
         $client = [
             'id' => $uuid,
@@ -71,9 +73,23 @@ class XrayUserManager
                 throw new RuntimeException('Could not write temporary Xray user file.');
             }
 
-            $this->run(['api', 'adu', $path]);
+            $aduOutput = trim($this->run(['api', 'adu', $path]));
+            $afterCountPayload = $this->count($tag);
+            $afterCount = $this->extractCount($afterCountPayload);
 
-            return $this->list($tag, $email);
+            if ($beforeCount !== null && $afterCount !== null && $afterCount <= $beforeCount) {
+                throw new RuntimeException(
+                    "Xray did not add a runtime user (count stayed {$beforeCount}). adu output: ".
+                    ($aduOutput !== '' ? $aduOutput : '[empty]')
+                );
+            }
+
+            return [
+                'before_count' => $beforeCount,
+                'after_count' => $afterCount,
+                'adu_output' => $aduOutput,
+                'readback' => $this->list($tag, $email),
+            ];
         } finally {
             @unlink($path);
         }
@@ -104,6 +120,26 @@ class XrayUserManager
         }
 
         return $payload;
+    }
+
+    private function extractCount(array $payload): ?int
+    {
+        foreach (['count', 'userCount', 'user_count', 'value'] as $key) {
+            if (isset($payload[$key]) && is_numeric($payload[$key])) {
+                return (int) $payload[$key];
+            }
+        }
+
+        foreach ($payload as $value) {
+            if (is_array($value)) {
+                $count = $this->extractCount($value);
+                if ($count !== null) {
+                    return $count;
+                }
+            }
+        }
+
+        return null;
     }
 
     private function run(array $arguments): string
