@@ -8,7 +8,11 @@ use Symfony\Component\Process\Process;
 final class XrayOnlineReader
 {
     /**
-     * Read Xray's live online counter for the supplied users.
+     * Read Xray's live IP list for the supplied users.
+     *
+     * Some Xray builds leave the scalar statsonline counter at 1 after the
+     * last IP has already disappeared. The IP list is therefore the source
+     * of truth for presence.
      *
      * @param iterable<string> $emails
      * @return array<string, bool>
@@ -27,7 +31,7 @@ final class XrayOnlineReader
             $process = new Process([
                 $binary,
                 'api',
-                'statsonline',
+                'statsonlineiplist',
                 '--server='.(string) config('xray.api_address'),
                 '--timeout='.(int) config('xray.timeout'),
                 '-email',
@@ -37,7 +41,7 @@ final class XrayOnlineReader
             $process->run();
 
             if ($process->isSuccessful()) {
-                $result[$email] = $this->parse($process->getOutput(), $email);
+                $result[$email] = $this->parseIpList($process->getOutput(), $email);
                 continue;
             }
 
@@ -49,28 +53,49 @@ final class XrayOnlineReader
             }
 
             throw new RuntimeException(
-                "Xray online query failed for {$email}: ".($message ?: 'unknown error')
+                "Xray online IP query failed for {$email}: ".($message ?: 'unknown error')
             );
         }
 
         return $result;
     }
 
-    public function parse(string $output, string $email): bool
+    public function parseIpList(string $output, string $email): bool
     {
         $payload = json_decode(trim($output), true);
-        $stat = is_array($payload) ? ($payload['stat'] ?? null) : null;
-        if (!is_array($stat)) {
+        if (!is_array($payload)) {
             throw new RuntimeException(
-                'Xray returned invalid statsonline JSON: '.mb_substr(trim($output), 0, 500)
+                'Xray returned invalid statsonlineiplist JSON: '.mb_substr(trim($output), 0, 500)
             );
         }
 
         $expectedName = "user>>>{$email}>>>online";
-        if (($stat['name'] ?? null) !== $expectedName) {
-            throw new RuntimeException('Xray statsonline response belongs to another user.');
+        $name = $payload['name'] ?? ($payload['stat']['name'] ?? null);
+        if ($name !== $expectedName) {
+            throw new RuntimeException('Xray statsonlineiplist response belongs to another user.');
         }
 
-        return (int) ($stat['value'] ?? 0) > 0;
+        return $this->containsIpAddress($payload);
+    }
+
+    private function containsIpAddress(array $payload): bool
+    {
+        foreach ($payload as $key => $value) {
+            if ($key === 'name') continue;
+
+            if (is_array($value) && $this->containsIpAddress($value)) return true;
+            if (!is_string($value)) continue;
+
+            $candidate = trim($value, "[] \t\n\r\0\x0B");
+            if (filter_var($candidate, FILTER_VALIDATE_IP) !== false) return true;
+
+            // Be tolerant if a future CLI version emits IP:port.
+            $host = parse_url('tcp://'.$value, PHP_URL_HOST);
+            if (is_string($host) && filter_var(trim($host, '[]'), FILTER_VALIDATE_IP) !== false) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
