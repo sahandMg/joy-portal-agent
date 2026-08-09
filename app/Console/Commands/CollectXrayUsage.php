@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\XrayUsageCollector;
+use App\Services\PortalUsageSessionTracker;
 use Illuminate\Console\Command;
 use Throwable;
 
@@ -14,10 +15,13 @@ class CollectXrayUsage extends Command
 
     protected $description = 'Read and persist per-user Xray counters without modifying user quota';
 
-    public function handle(XrayUsageCollector $collector): int
+    public function handle(XrayUsageCollector $collector, PortalUsageSessionTracker $tracker): int
     {
         try {
             $result = $collector->collect();
+            $sync = config('xray.joy_sync_enabled')
+                ? $tracker->process($result)
+                : ['changed' => 0, 'closed' => 0, 'reported' => 0, 'rejected' => 0];
         } catch (Throwable $e) {
             report($e);
             $this->error($e->getMessage());
@@ -43,6 +47,10 @@ class CollectXrayUsage extends Command
         }
 
         $this->info('Collection: '.$result['collection_id']);
+        if (config('xray.joy_sync_enabled')) {
+            $this->line(sprintf('Joy sync: %d changed, %d closed, %d reported, %d pending/rejected.',
+                $sync['changed'], $sync['closed'], $sync['reported'], $sync['rejected']));
+        }
 
         if ($users->isEmpty()) {
             $this->line('No changed user counters were returned by Xray.');

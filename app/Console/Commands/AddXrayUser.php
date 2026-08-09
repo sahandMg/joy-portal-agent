@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\XrayUsageSnapshot;
 use App\Services\XrayUserManager;
 use Illuminate\Console\Command;
 use Throwable;
@@ -73,6 +74,14 @@ class AddXrayUser extends Command
         }
 
         $this->info('Xray added the runtime user and the inbound user count increased.');
+        XrayUsageSnapshot::query()->firstOrCreate(
+            ['email' => $email],
+            [
+                'uplink_total_bytes' => 0,
+                'downlink_total_bytes' => 0,
+                'observed_at' => now(),
+            ]
+        );
         $this->warn('An empty object in readback can be a CLI/Core serialization limitation.');
         $this->line(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
         return self::SUCCESS;
