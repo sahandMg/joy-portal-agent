@@ -43,6 +43,12 @@ final class SyncXrayUsers extends Command
                 $reconcile['inboundCleanup']['failed']));
         $failed = $reconcile['users']['failed'] + $reconcile['inboundEnsure']['failed'] +
             $reconcile['inboundCleanup']['failed'];
+        foreach (['inboundEnsure', 'users', 'inboundCleanup'] as $section) {
+            foreach ($reconcile[$section]['errors'] ?? [] as $error) {
+                $subject = $error['tag'] ?? $error['email'] ?? $section;
+                $this->error($subject.': '.($error['message'] ?? 'Unknown error'));
+            }
+        }
         return $failed === 0 ? self::SUCCESS : self::FAILURE;
     }
 }
