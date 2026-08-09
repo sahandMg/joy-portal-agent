@@ -9,7 +9,10 @@ use Throwable;
 
 final class PortalUsageSessionTracker
 {
-    public function __construct(private JoyUsageClient $client) {}
+    public function __construct(
+        private JoyUsageClient $client,
+        private XrayOnlineReader $onlineReader,
+    ) {}
 
     public function process(array $collection): array
     {
@@ -44,11 +47,49 @@ final class PortalUsageSessionTracker
             }, 3);
         }
 
-        $closed = PortalUsageSession::query()->whereNull('closed_at')
-            ->where('last_activity_at', '<=', now()->subSeconds((int) config('xray.session_idle_timeout', 180)))
-            ->update(['closed_at' => now(), 'updated_at' => now()]);
+        $closed = $this->synchronizeOnlineState();
 
         return ['changed' => $changed, 'closed' => $closed] + $this->flushPending();
+    }
+
+    private function synchronizeOnlineState(): int
+    {
+        $openSessions = PortalUsageSession::query()
+            ->whereNull('closed_at')
+            ->orderBy('id')
+            ->get();
+        if ($openSessions->isEmpty()) return 0;
+
+        if (config('xray.online_status_enabled', true)) {
+            try {
+                $online = $this->onlineReader->read($openSessions->pluck('email')->all());
+                $closed = 0;
+
+                foreach ($openSessions as $session) {
+                    if ($online[$session->email] ?? false) {
+                        // This timestamp now also means Xray positively confirmed presence.
+                        // It keeps idle-but-connected users online without creating usage.
+                        $session->update(['last_activity_at' => now()]);
+                        continue;
+                    }
+
+                    $session->update(['closed_at' => now()]);
+                    $closed++;
+                }
+
+                return $closed;
+            } catch (Throwable $exception) {
+                // A temporary StatsService failure must not disconnect everyone. The idle
+                // timeout below is deliberately retained as a conservative fallback.
+                report($exception);
+            }
+        }
+
+        return PortalUsageSession::query()->whereNull('closed_at')
+            ->where('last_activity_at', '<=', now()->subSeconds(
+                (int) config('xray.session_idle_timeout', 180)
+            ))
+            ->update(['closed_at' => now(), 'updated_at' => now()]);
     }
 
     public function flushPending(): array
