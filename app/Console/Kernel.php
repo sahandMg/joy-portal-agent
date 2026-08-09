@@ -15,6 +15,18 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
+        if (config('xray.user_writes_enabled') && config('xray.credential_sync_enabled')) {
+            $schedule->command('xray:users:sync')
+                ->everyMinute()
+                ->withoutOverlapping(5);
+        }
+
+        if (config('xray.user_writes_enabled') && config('xray.user_reconcile_enabled')) {
+            $schedule->command('xray:desired:reconcile')
+                ->everyMinute()
+                ->withoutOverlapping(5);
+        }
+
         if (config('xray.collection_enabled')) {
             $schedule->command('xray:usage:collect --quiet')
                 ->everyMinute()

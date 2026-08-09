@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\XrayRuntimeUser;
 use App\Models\XrayUsageSnapshot;
 use App\Services\XrayUserManager;
 use Illuminate\Console\Command;
@@ -17,8 +18,9 @@ class AddXrayUser extends Command
         {--port= : Inbound listen port; inferred from tags like inbound-20180}
         {--level=0}
         {--alter-id=0 : VMess alterId}
+        {--persist-only : Save a user that already exists in the running Xray instance}
         {--force : Skip interactive confirmation}';
-    protected $description = 'Add one runtime user to an existing Xray inbound';
+    protected $description = 'Persist and add one runtime user to an existing Xray inbound';
 
     public function handle(XrayUserManager $manager): int
     {
@@ -51,29 +53,78 @@ class AddXrayUser extends Command
             return self::INVALID;
         }
 
-        $this->warn('This modifies running Xray and is not persisted after restart.');
         $this->line("Inbound: {$tag}; port: {$port}; protocol: {$protocol}; email: {$email}");
         if (!$this->option('force') && !$this->confirm('Add this test user?', false)) {
             $this->line('Cancelled.');
             return self::SUCCESS;
         }
 
+        $level = max(0, (int) $this->option('level'));
+        $alterId = max(0, (int) $this->option('alter-id'));
+        $existing = XrayRuntimeUser::query()->where('email', $email)->first();
+
+        if ($existing && (
+            $existing->inbound_tag !== $tag ||
+            $existing->protocol !== $protocol ||
+            $existing->uuid !== $uuid ||
+            $existing->port !== $port
+        )) {
+            $this->error('This email is already persisted with different connection details. Remove it first.');
+            return self::FAILURE;
+        }
+
+        $runtimeUser = XrayRuntimeUser::query()->updateOrCreate(
+            ['email' => $email],
+            [
+                'inbound_tag' => $tag,
+                'protocol' => $protocol,
+                'uuid' => $uuid,
+                'port' => $port,
+                'level' => $level,
+                'alter_id' => $alterId,
+                'is_active' => true,
+                'last_error' => null,
+            ]
+        );
+
         try {
-            $payload = $manager->add(
-                $tag,
-                $protocol,
-                $uuid,
-                $email,
-                $port,
-                max(0, (int) $this->option('level')),
-                max(0, (int) $this->option('alter-id'))
-            );
+            $alreadyExists = $manager->exists($tag, $email);
+            $payload = null;
+
+            if (!$this->option('persist-only') && !$alreadyExists) {
+                $payload = $manager->add(
+                    $tag,
+                    $protocol,
+                    $uuid,
+                    $email,
+                    $port,
+                    $level,
+                    $alterId
+                );
+            }
+
+            if ($this->option('persist-only') && !$alreadyExists) {
+                throw new \RuntimeException(
+                    'The user is not present in running Xray; omit --persist-only to add it now.'
+                );
+            }
+
+            $runtimeUser->forceFill([
+                'last_synced_at' => now(),
+                'last_error' => null,
+            ])->save();
         } catch (Throwable $e) {
+            $runtimeUser->forceFill([
+                'last_synced_at' => null,
+                'last_error' => mb_substr($e->getMessage(), 0, 2000),
+            ])->save();
             $this->error($e->getMessage());
             return self::FAILURE;
         }
 
-        $this->info('Xray added the runtime user and the inbound user count increased.');
+        $this->info($alreadyExists
+            ? 'User was already present and is now persisted for restart recovery.'
+            : 'Xray added the user and it is persisted for restart recovery.');
         XrayUsageSnapshot::query()->firstOrCreate(
             ['email' => $email],
             [
@@ -82,8 +133,9 @@ class AddXrayUser extends Command
                 'observed_at' => now(),
             ]
         );
-        $this->warn('An empty object in readback can be a CLI/Core serialization limitation.');
-        $this->line(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        if ($payload !== null) {
+            $this->line(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        }
         return self::SUCCESS;
     }
 }

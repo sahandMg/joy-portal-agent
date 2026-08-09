@@ -83,6 +83,11 @@ final class XrayOnlineReader
         foreach ($payload as $key => $value) {
             if ($key === 'name') continue;
 
+            $keyCandidate = trim((string) $key, "[] \t\n\r\0\x0B");
+            if (filter_var($keyCandidate, FILTER_VALIDATE_IP) !== false) {
+                return true;
+            }
+
             if (is_array($value) && $this->containsIpAddress($value)) return true;
             if (!is_string($value)) continue;
 

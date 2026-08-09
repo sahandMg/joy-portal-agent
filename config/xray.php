@@ -8,9 +8,12 @@ return [
     'reset_after_read' => filter_var(env('XRAY_RESET_AFTER_READ', false), FILTER_VALIDATE_BOOL),
     'collection_enabled' => filter_var(env('XRAY_COLLECTION_ENABLED', false), FILTER_VALIDATE_BOOL),
     'user_writes_enabled' => filter_var(env('XRAY_USER_WRITES_ENABLED', false), FILTER_VALIDATE_BOOL),
+    'user_reconcile_enabled' => filter_var(env('XRAY_USER_RECONCILE_ENABLED', false), FILTER_VALIDATE_BOOL),
     'node_id' => env('JOY_NODE_ID', gethostname() ?: 'portal-1'),
     'joy_sync_enabled' => filter_var(env('JOY_USAGE_SYNC_ENABLED', false), FILTER_VALIDATE_BOOL),
     'joy_usage_url' => env('JOY_USAGE_URL'),
+    'joy_credentials_url' => env('JOY_CREDENTIALS_URL'),
+    'credential_sync_enabled' => filter_var(env('JOY_CREDENTIAL_SYNC_ENABLED', false), FILTER_VALIDATE_BOOL),
     'joy_agent_id' => env('JOY_AGENT_ID', 'portal-1'),
     'joy_agent_secret' => env('JOY_AGENT_SECRET'),
     'joy_timeout' => max(1, (int) env('JOY_API_TIMEOUT', 10)),
@@ -18,4 +21,5 @@ return [
     'session_idle_timeout' => max(60, (int) env('XRAY_SESSION_IDLE_TIMEOUT', 180)),
     'online_status_enabled' => filter_var(env('XRAY_ONLINE_STATUS_ENABLED', true), FILTER_VALIDATE_BOOL),
     'joy_heartbeat_interval' => max(30, (int) env('JOY_HEARTBEAT_INTERVAL', 60)),
+    'online_offline_grace' => max(60, (int) env('XRAY_ONLINE_OFFLINE_GRACE', 120)),
 ];

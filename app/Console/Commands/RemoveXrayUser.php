@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Services\XrayUserManager;
+use App\Models\XrayRuntimeUser;
+use App\Services\XrayRuntimeUserReconciler;
 use Illuminate\Console\Command;
-use Throwable;
 
 class RemoveXrayUser extends Command
 {
@@ -12,9 +12,9 @@ class RemoveXrayUser extends Command
         {tag : Existing inbound tag}
         {email : Exact email to remove}
         {--force : Skip interactive confirmation}';
-    protected $description = 'Remove one runtime Xray user by email';
+    protected $description = 'Disable and remove one persistent runtime Xray user by email';
 
-    public function handle(XrayUserManager $manager): int
+    public function handle(XrayRuntimeUserReconciler $reconciler): int
     {
         $tag = (string) $this->argument('tag');
         $email = (string) $this->argument('email');
@@ -25,14 +25,25 @@ class RemoveXrayUser extends Command
             return self::SUCCESS;
         }
 
-        try {
-            $manager->remove($tag, $email);
-        } catch (Throwable $e) {
-            $this->error($e->getMessage());
+        $user = XrayRuntimeUser::query()
+            ->where('inbound_tag', $tag)
+            ->where('email', $email)
+            ->first();
+
+        if (!$user) {
+            $this->error('Persistent runtime user was not found.');
             return self::FAILURE;
         }
 
-        $this->info('User removed from the running Xray instance.');
+        $user->forceFill(['is_active' => false, 'last_synced_at' => null])->save();
+        $result = $reconciler->reconcile($email);
+        if ($result['failed'] > 0) {
+            $this->error($result['errors'][0]['message'] ?? 'Removal reconciliation failed.');
+            $this->warn('The desired state is saved as disabled and the scheduler will retry removal.');
+            return self::FAILURE;
+        }
+
+        $this->info('User disabled persistently and removed from the running Xray instance.');
         return self::SUCCESS;
     }
 }

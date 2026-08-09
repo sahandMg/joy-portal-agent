@@ -23,6 +23,11 @@ class XrayUserManager
         return $this->runJson(['api', 'inboundusercount', '-tag='.$tag]);
     }
 
+    public function exists(string $tag, string $email): bool
+    {
+        return $this->payloadContainsEmail($this->list($tag, $email), $email);
+    }
+
     public function add(
         string $tag,
         string $protocol,
@@ -142,6 +147,21 @@ class XrayUserManager
         }
 
         return null;
+    }
+
+    private function payloadContainsEmail(array $payload, string $email): bool
+    {
+        if (($payload['email'] ?? null) === $email) {
+            return true;
+        }
+
+        foreach ($payload as $value) {
+            if (is_array($value) && $this->payloadContainsEmail($value, $email)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function run(array $arguments): string

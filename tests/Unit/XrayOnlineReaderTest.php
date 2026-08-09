@@ -37,6 +37,19 @@ class XrayOnlineReaderTest extends TestCase
         $this->assertTrue((new XrayOnlineReader())->parseIpList($json, 'joy:test-user-a'));
     }
 
+    public function test_it_accepts_xray_ip_map_keys(): void
+    {
+        $json = json_encode([
+            'name' => 'user>>>joy:test-user-a>>>online',
+            'ips' => [
+                '203.0.113.10' => 1786289413,
+                '2001:db8::10' => 1786289420,
+            ],
+        ]);
+
+        $this->assertTrue((new XrayOnlineReader())->parseIpList($json, 'joy:test-user-a'));
+    }
+
     public function test_it_rejects_a_response_for_another_user(): void
     {
         $this->expectException(RuntimeException::class);

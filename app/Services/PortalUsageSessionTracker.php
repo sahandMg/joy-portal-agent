@@ -17,12 +17,15 @@ final class PortalUsageSessionTracker
     public function process(array $collection): array
     {
         $changed = 0;
+        $trafficActiveEmails = [];
         foreach ($collection['users'] ?? [] as $row) {
             $delta = max(0, (int) ($row['total_delta_bytes'] ?? 0));
             if ($delta === 0) continue;
 
-            DB::transaction(function () use ($row, $delta, &$changed) {
-                $email = (string) $row['email'];
+            $email = (string) $row['email'];
+            $trafficActiveEmails[$email] = true;
+
+            DB::transaction(function () use ($row, $delta, $email, &$changed) {
                 $session = PortalUsageSession::query()->where('email', $email)
                     ->whereNull('closed_at')->lockForUpdate()->first();
 
@@ -47,13 +50,15 @@ final class PortalUsageSessionTracker
             }, 3);
         }
 
-        $closed = $this->synchronizeOnlineState();
+        $closed = $this->synchronizeOnlineState(array_keys($trafficActiveEmails));
 
         return ['changed' => $changed, 'closed' => $closed] + $this->flushPending();
     }
 
-    private function synchronizeOnlineState(): int
+    /** @param array<int, string> $trafficActiveEmails */
+    private function synchronizeOnlineState(array $trafficActiveEmails): int
     {
+        $trafficActive = array_fill_keys($trafficActiveEmails, true);
         $openSessions = PortalUsageSession::query()
             ->whereNull('closed_at')
             ->orderBy('id')
@@ -66,10 +71,21 @@ final class PortalUsageSessionTracker
                 $closed = 0;
 
                 foreach ($openSessions as $session) {
-                    if ($online[$session->email] ?? false) {
-                        // This timestamp now also means Xray positively confirmed presence.
-                        // It keeps idle-but-connected users online without creating usage.
+                    if (($online[$session->email] ?? false) || isset($trafficActive[$session->email])) {
+                        // Either a live Xray IP or bytes observed in this exact collection
+                        // positively confirms presence. Proxy transports may close their
+                        // TCP socket between requests, so an empty instantaneous IP list
+                        // must not override traffic observed by the same collection.
                         $session->update(['last_activity_at' => now()]);
+                        continue;
+                    }
+
+                    // Require both an empty IP list and a quiet period before declaring
+                    // the session offline. This absorbs gaps between short-lived WS/TCP
+                    // requests while still emitting a deterministic offline report.
+                    $grace = (int) config('xray.online_offline_grace', 120);
+                    if ($session->last_activity_at &&
+                        $session->last_activity_at->gt(now()->subSeconds($grace))) {
                         continue;
                     }
 
