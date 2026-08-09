@@ -16,4 +16,5 @@ return [
     'joy_timeout' => max(1, (int) env('JOY_API_TIMEOUT', 10)),
     'joy_batch_size' => max(1, min(500, (int) env('JOY_USAGE_BATCH_SIZE', 200))),
     'session_idle_timeout' => max(60, (int) env('XRAY_SESSION_IDLE_TIMEOUT', 180)),
+    'joy_heartbeat_interval' => max(30, (int) env('JOY_HEARTBEAT_INTERVAL', 60)),
 ];

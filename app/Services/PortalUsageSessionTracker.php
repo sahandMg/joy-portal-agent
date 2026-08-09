@@ -54,7 +54,19 @@ final class PortalUsageSessionTracker
     public function flushPending(): array
     {
         $pending = PortalUsageSession::query()
-            ->whereColumn('last_reported_total_bytes', '<', 'total_bytes')
+            ->where(function ($query) {
+                $query->whereColumn('last_reported_total_bytes', '<', 'total_bytes')
+                    ->orWhere(function ($active) {
+                        $active->whereNull('closed_at')->where(function ($heartbeat) {
+                            $heartbeat->whereNull('last_reported_at')
+                                ->orWhere('last_reported_at', '<=', now()->subSeconds(
+                                    (int) config('xray.joy_heartbeat_interval', 60)
+                                ));
+                        });
+                    })->orWhere(function ($closed) {
+                        $closed->whereNotNull('closed_at')->whereNull('closed_reported_at');
+                    });
+            })
             ->orderBy('id')->limit((int) config('xray.joy_batch_size', 200))->get();
         if ($pending->isEmpty()) return ['reported' => 0, 'rejected' => 0];
 
@@ -77,6 +89,7 @@ final class PortalUsageSessionTracker
                 $session->update([
                     'last_reported_total_bytes' => $session->total_bytes,
                     'last_reported_at' => now(), 'last_error' => null,
+                    'closed_reported_at' => $session->closed_at ? now() : null,
                 ]);
                 $reported++;
             } else {

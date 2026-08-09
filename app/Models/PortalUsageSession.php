@@ -13,6 +13,7 @@ class PortalUsageSession extends Model
         'last_reported_total_bytes' => 'integer',
         'last_activity_at' => 'datetime',
         'closed_at' => 'datetime',
+        'closed_reported_at' => 'datetime',
         'last_reported_at' => 'datetime',
     ];
 }
