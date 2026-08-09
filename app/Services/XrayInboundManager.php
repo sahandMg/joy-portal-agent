@@ -70,7 +70,23 @@ class XrayInboundManager
                 JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) === false) {
                 throw new RuntimeException('Could not write temporary inbound file.');
             }
-            $this->run(['api', 'adi', $path]);
+            $output = $this->run(['api', 'adi', $path]);
+            $actual = $this->profiles()[$inbound->tag] ?? null;
+            if ($actual === null) {
+                throw new RuntimeException(
+                    'Xray adi returned success but did not create handler '.$inbound->tag.'. Output: '.
+                    (trim($output) ?: '[empty]')
+                );
+            }
+            if (($actual['protocol'] ?? null) !== $inbound->protocol ||
+                ($actual['transport'] ?? null) !== $inbound->transport ||
+                (int) ($actual['port'] ?? 0) !== (int) $inbound->port ||
+                ($inbound->transport === 'ws' &&
+                    ($actual['ws_path'] ?? '/') !== ($inbound->ws_path ?: '/'))) {
+                throw new RuntimeException(
+                    'Xray created handler '.$inbound->tag.' with a profile different from the requested one.'
+                );
+            }
         } finally {
             @unlink($path);
         }

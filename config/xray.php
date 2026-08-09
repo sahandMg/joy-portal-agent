@@ -13,6 +13,8 @@ return [
     'joy_sync_enabled' => filter_var(env('JOY_USAGE_SYNC_ENABLED', false), FILTER_VALIDATE_BOOL),
     'joy_usage_url' => env('JOY_USAGE_URL'),
     'joy_credentials_url' => env('JOY_CREDENTIALS_URL'),
+    'joy_runtime_status_url' => env('JOY_RUNTIME_STATUS_URL',
+        'https://app2.iclland.ir/api/internal/portal/runtime/status'),
     'credential_sync_enabled' => filter_var(env('JOY_CREDENTIAL_SYNC_ENABLED', false), FILTER_VALIDATE_BOOL),
     'joy_agent_id' => env('JOY_AGENT_ID', 'portal-1'),
     'joy_agent_secret' => env('JOY_AGENT_SECRET'),

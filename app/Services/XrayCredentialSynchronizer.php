@@ -71,7 +71,19 @@ final class XrayCredentialSynchronizer
             return ['credentials' => count($emails), 'inbounds' => count($tags)];
         }, 3);
 
-        return ['received' => $saved, 'reconcile' => $this->reconciler->reconcile()];
+        $reconcile = $this->reconciler->reconcile();
+        $this->client->reportRuntimeStatus(XrayRuntimeUser::query()->orderBy('id')->get()->map(
+            function (XrayRuntimeUser $user): array {
+                $status = $user->last_error
+                    ? 'error'
+                    : ($user->is_active
+                        ? ($user->last_synced_at ? 'created' : 'pending')
+                        : 'removed');
+                return ['email' => $user->email, 'status' => $status,
+                    'error' => $user->last_error];
+            }
+        )->all());
+        return ['received' => $saved, 'reconcile' => $reconcile];
     }
 
     private function validateRow($row): array
