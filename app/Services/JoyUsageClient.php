@@ -41,7 +41,8 @@ final class JoyUsageClient
                 'X-Joy-Timestamp' => $timestamp,
                 'X-Joy-Signature' => $signature,
                 'Accept' => 'application/json',
-            ])->withBody($body, 'application/json')->post($url);
+                'Content-Type' => 'application/json',
+            ])->send('POST', $url, ['body' => $body]);
 
         if (!$response->successful()) {
             throw new RuntimeException('Joy usage API returned HTTP '.$response->status().': '.mb_substr($response->body(), 0, 500));
