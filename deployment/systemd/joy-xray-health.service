@@ -1,0 +1,17 @@
+[Unit]
+Description=Joy Xray health monitor
+After=network-online.target x-ui.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/html/joy-portal-agent
+ExecStart=/usr/bin/php artisan xray:health:watch --interval=30
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

@@ -15,6 +15,8 @@ return [
     'joy_credentials_url' => env('JOY_CREDENTIALS_URL'),
     'joy_runtime_status_url' => env('JOY_RUNTIME_STATUS_URL',
         'https://app2.iclland.ir/api/internal/portal/runtime/status'),
+    'joy_health_url' => env('JOY_HEALTH_URL',
+        'https://app2.iclland.ir/api/internal/portal/health'),
     'credential_sync_enabled' => filter_var(env('JOY_CREDENTIAL_SYNC_ENABLED', false), FILTER_VALIDATE_BOOL),
     'joy_agent_id' => env('JOY_AGENT_ID', 'portal-1'),
     'joy_agent_secret' => env('JOY_AGENT_SECRET'),
@@ -24,4 +26,9 @@ return [
     'online_status_enabled' => filter_var(env('XRAY_ONLINE_STATUS_ENABLED', true), FILTER_VALIDATE_BOOL),
     'joy_heartbeat_interval' => max(30, (int) env('JOY_HEARTBEAT_INTERVAL', 60)),
     'online_offline_grace' => max(60, (int) env('XRAY_ONLINE_OFFLINE_GRACE', 120)),
+    'health_enabled' => filter_var(env('XRAY_HEALTH_ENABLED', true), FILTER_VALIDATE_BOOL),
+    'service_name' => env('XRAY_SERVICE_NAME', 'x-ui'),
+    'health_interval' => max(10, (int) env('XRAY_HEALTH_INTERVAL', 30)),
+    'restart_cooldown' => max(10, (int) env('XRAY_RESTART_COOLDOWN', 60)),
+    'restart_wait' => max(5, (int) env('XRAY_RESTART_WAIT', 20)),
 ];

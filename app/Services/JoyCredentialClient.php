@@ -31,6 +31,19 @@ final class JoyCredentialClient
         ]);
     }
 
+    public function reportHealth(array $health): array
+    {
+        $url = (string) config('xray.joy_health_url');
+        if ($url === '') throw new RuntimeException('Joy node health URL is not configured.');
+        return $this->signedPost($url, [
+            'node_id' => (string) config('xray.node_id'),
+            'healthy' => (bool) ($health['healthy'] ?? false),
+            'restarted' => (bool) ($health['restarted'] ?? false),
+            'error' => $health['error'] ?? null,
+            'checked_at' => now()->toIso8601String(),
+        ]);
+    }
+
     private function signedPost(string $url, array $payload): array
     {
         $agentId = (string) config('xray.joy_agent_id');
